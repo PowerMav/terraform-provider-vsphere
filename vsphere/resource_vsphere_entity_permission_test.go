@@ -13,13 +13,13 @@ func TestAccResourceVSphereEntityPermission(t *testing.T) {
 		PreCheck: func() {
 			testAccPreCheck(t)
 		},
-		Providers: testAccProviders,
-		//CheckDestroy: testAccResourceVSphereEntityPermissionExists(false),
+		Providers:    testAccProviders,
+		CheckDestroy: testAccResourceVSphereEntityPermissionExists(false),
 		Steps: []resource.TestStep{
 			{
 				Config: testAccResourceVSphereEntityPermissionConfigBasic(),
-				Check:  resource.ComposeTestCheckFunc(
-				//testAccResourceVSphereEntityPermissionExists(true),
+				Check: resource.ComposeTestCheckFunc(
+					testAccResourceVSphereEntityPermissionExists(true),
 				),
 			},
 		},
@@ -55,16 +55,23 @@ data "vsphere_datacenter" "dc" {
 resource "vsphere_folder" "folder" {
 	path = "terraform-test-folder"
 	type = "vm"
-	datacenter_id = "${data.vsphere_datacenter.dc}"
+	datacenter_id = "${data.vsphere_datacenter.dc.id}"
 }
 
 data "vsphere_role" "default" {
 	name = "Admin"
 }
 
+data "vsphere_datastore" "datastore" {
+	name = "nfsds1"
+	datacenter_id = "${data.vsphere_datacenter.dc.id}"
+}
+
 resource "vsphere_entity_permission" "entity_permission" {
-	principal = "VSPHERE.LOCAL\\Administrator"
+	principal = "vsphere.hashicorptest.internal\\administrator"
 	role_id   = "${data.vsphere_role.default.id}"
+	entity_id = "${data.vsphere_datastore.datastore.id}"
+	entity_type = "Datastore"
 }
 `,
 		"hashi-dc",

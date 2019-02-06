@@ -44,13 +44,14 @@ func dataSourceVSphereEntityPermissionRead(d *schema.ResourceData, meta interfac
 		d.SetId("")
 		return err
 	}
-	_, f, err := permission.SplitID(d.Id())
+	id, t, _, err := permission.SplitID(d.Id())
 	if err != nil {
 		return err
 	}
 	d.Set("propagate", p.Propagate)
 	d.Set("role_id", fmt.Sprint(p.RoleId))
-	d.Set("folder_path", f)
+	d.Set("entity_id", id)
+	d.Set("entity_type", t)
 	d.Set("group", p.Group)
 	d.SetId(p.Principal)
 	return nil

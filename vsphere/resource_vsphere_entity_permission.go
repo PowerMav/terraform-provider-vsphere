@@ -27,11 +27,15 @@ func resourceVSphereEntityPermission() *schema.Resource {
 				Required: true,
 				ForceNew: true,
 			},
-			"folder_path": &schema.Schema{
+			"entity_id": &schema.Schema{
 				Type:     schema.TypeString,
-				Optional: true,
+				Required: true,
 				ForceNew: true,
-				Default:  "/",
+			},
+			"entity_type": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
+				ForceNew: true,
 			},
 			"propagate": &schema.Schema{
 				Type:     schema.TypeBool,
@@ -49,7 +53,7 @@ func resourceVSphereEntityPermission() *schema.Resource {
 
 func resourceVSphereEntityPermissionRead(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*VSphereClient).vimClient
-	principal, folderPath, err := permission.SplitID(d.Id())
+	entityID, entityType, principal, err := permission.SplitID(d.Id())
 	if err != nil {
 		return err
 	}
@@ -59,27 +63,41 @@ func resourceVSphereEntityPermissionRead(d *schema.ResourceData, meta interface{
 		return err
 	}
 
-	d.Set("propagate", p.Propagate)
-	d.Set("role_id", fmt.Sprint(p.RoleId))
-	d.Set("group", p.Group)
-	d.Set("principal", principal)
-	d.Set("folder_path", folderPath)
+	if err = d.Set("propagate", p.Propagate); err != nil {
+		return err
+	}
+	if err = d.Set("role_id", fmt.Sprint(p.RoleId)); err != nil {
+		return err
+	}
+	if err = d.Set("group", p.Group); err != nil {
+		return err
+	}
+	if err = d.Set("principal", principal); err != nil {
+		return err
+	}
+	if err = d.Set("entity_id", entityID); err != nil {
+		return err
+	}
+	if err = d.Set("entity_type", entityType); err != nil {
+		return err
+	}
 	return nil
 }
 
 func resourceVSphereEntityPermissionCreate(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*VSphereClient).vimClient
 	principal := d.Get("principal").(string)
-	folderPath := d.Get("folder_path").(string)
+	entityID := d.Get("entity_id").(string)
+	entityType := d.Get("entity_type").(string)
 	group := d.Get("group").(bool)
 	roleID := d.Get("role_id").(int)
 	propagate := d.Get("propagate").(bool)
-	err := permission.Create(client, principal, folderPath, roleID, group, propagate)
+	err := permission.Create(client, entityType, entityID, principal, roleID, group, propagate)
 	if err != nil {
 		d.SetId("")
 		return err
 	}
-	d.SetId(permission.ConcatID(folderPath, principal))
+	d.SetId(permission.ConcatID(entityID, entityType, principal))
 	return resourceVSphereEntityPermissionRead(d, meta)
 }
 

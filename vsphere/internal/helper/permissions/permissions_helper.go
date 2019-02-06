@@ -15,7 +15,7 @@ import (
 
 // ByID check if a permissions exist, and return that permissions
 func ByID(client *govmomi.Client, id string) (*types.Permission, error) {
-	principal, folderPath, err := SplitID(id)
+	entityID, entityType, principal, err := SplitID(id)
 	if err != nil {
 		return nil, err
 	}
@@ -23,13 +23,18 @@ func ByID(client *govmomi.Client, id string) (*types.Permission, error) {
 	finder := find.NewFinder(client.Client, true)
 	ctx, cancel := context.WithTimeout(context.Background(), provider.DefaultAPITimeout)
 	defer cancel()
-	elements, _ := finder.ManagedObjectList(ctx, folderPath)
 
-	if len(elements) == 0 {
-		return nil, errors.New("Folder Path is invalid")
+	ref := types.ManagedObjectReference{
+		Type:  entityType,
+		Value: entityID,
 	}
 
-	permissions, err := m.RetrieveEntityPermissions(ctx, elements[0].Object.Reference(), true)
+	entity, err := finder.ObjectReference(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	permissions, err := m.RetrieveEntityPermissions(ctx, entity.Reference(), true)
 	if err != nil {
 		return nil, err
 	}
@@ -44,19 +49,14 @@ func ByID(client *govmomi.Client, id string) (*types.Permission, error) {
 }
 
 // Create Entity Permission
-func Create(client *govmomi.Client, principal string, folderPath string, roleID int, group bool, propagate bool) error {
+func Create(client *govmomi.Client, entityID string, principal string, entityType string, roleID int, group bool, propagate bool) error {
 	m := object.NewAuthorizationManager(client.Client)
-	finder := find.NewFinder(client.Client, true)
 	ctx, cancel := context.WithTimeout(context.Background(), provider.DefaultAPITimeout)
 	defer cancel()
-	elements, err := finder.ManagedObjectList(ctx, folderPath)
 
-	if err != nil {
-		return err
-	}
-
-	if len(elements) == 0 {
-		return errors.New("No Entity found inside " + folderPath)
+	ref := types.ManagedObjectReference{
+		Type:  entityType,
+		Value: entityID,
 	}
 
 	perms := []types.Permission{types.Permission{
@@ -66,7 +66,7 @@ func Create(client *govmomi.Client, principal string, folderPath string, roleID 
 		Propagate: propagate,
 	}}
 
-	return m.SetEntityPermissions(ctx, elements[0].Object.Reference(), perms)
+	return m.SetEntityPermissions(ctx, ref, perms)
 }
 
 // Remove Entity Permission
@@ -79,15 +79,15 @@ func Remove(client *govmomi.Client, permission *types.Permission) error {
 }
 
 // SplitID takes the permission's ID and splits it into the folder and principal.
-func SplitID(id string) (string, string, error) {
+func SplitID(id string) (string, string, string, error) {
 	s := strings.Split(id, ":")
-	if len(s) != 2 {
-		return "", "", fmt.Errorf("role ID does not contain principal and folder")
+	if len(s) != 3 {
+		return "", "", "", fmt.Errorf("role ID does not contain principal, entity type, and entity ID")
 	}
-	return s[0], s[1], nil
+	return s[0], s[1], s[2], nil
 }
 
 // ConcatID takes a permission's folder and principal and generates an ID.
-func ConcatID(folder, principal string) string {
-	return fmt.Sprintf("%s:%s", folder, principal)
+func ConcatID(id, entityType, principal string) string {
+	return fmt.Sprintf("%s:%s:%s", id, entityType, principal)
 }
